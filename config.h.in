@@ -1,0 +1,10 @@
+/*
+ * Template for config.h
+ */
+
+#pragma once
+
+#define PROGRAM_NAME "@program-name@"
+#define PROGRAM_VERSION "@version@"
+#define DEFAULT_SIGNAL "@default-signal@"
+#define DEFAULT_LOCKER "@default-locker@"
