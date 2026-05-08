@@ -17,8 +17,8 @@ Spawns a program, then sends a signal when a valid fingerprint is read.
 	detected. It may be given as a name or a number. Defaults to *SIGUSR1*.
 
 *--* <program> <args>
-	Command to execute once fprint is ready. Separated from other args by
-	the *--* delimiter, if needed. Defaults to *swaylock*.
+	The command to execute once fprint is ready. Separated from other args
+	by the *--* delimiter, if needed. Defaults to *swaylock*.
 
 # SIGNALS
 
