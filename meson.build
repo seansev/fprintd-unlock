@@ -22,11 +22,8 @@ sources = [
 	'main.c',
 ]
 
-inc = include_directories('include')
-
 executable('fprintd-unlock',
 	sources,
-	include_directories: [inc],
 	dependencies: dependencies,
 	install: true,
 )
