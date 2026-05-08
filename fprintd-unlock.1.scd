@@ -6,19 +6,19 @@ fprintd-unlock - Fingerprint screen unlocking via fprint
 
 # SYNOPSIS
 
-*fprintd-unlock* [*-*_signal_|*-s* _signal_] [*--* _program_ [_args..._]]
+*fprintd-unlock* [*-s* _signal_] [*--*] [_program_ [_args..._]]
 
 Spawns a program, then sends a signal when a valid fingerprint is read.
 
 # OPTIONS
+
 *-s, --signal* <signal>
-	The signal to be sent to the child process when a valid fingerprint is detected. Defaults to *SIGUSR1*.
+	The signal to be sent to the child process when a valid fingerprint is
+	detected. It may be given as a name or a number. Defaults to *SIGUSR1*.
 
-*-*<signum>
-	Same as *-s*, but takes the signal number as the argument.
-
-*--* <executable> <args>
-	Command to execute once fprint is ready, separated from other args by the *--* delimiter. Defaults to *swaylock*.
+*--* <program> <args>
+	Command to execute once fprint is ready. Separated from other args by
+	the *--* delimiter, if needed. Defaults to *swaylock*.
 
 # SIGNALS
 
@@ -28,3 +28,7 @@ Spawns a program, then sends a signal when a valid fingerprint is read.
 # AUTHORS
 
 Written by Sean S. Williams <mail@seansev.com>.
+
+# SEE ALSO
+
+*swaylock*(1) *fprintd*(1) *kill*(1)
