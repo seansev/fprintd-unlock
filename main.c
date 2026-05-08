@@ -22,15 +22,18 @@
 */
 
 #include <getopt.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 
 #include "config.h"
+#include "signum.h"
 
 static struct option longopts[] = {
         {"signal", required_argument, NULL, 's'},
         {"help", no_argument, NULL, 'h'},
+        {"version", no_argument, NULL, 'v'},
         {0},
 };
 
@@ -42,18 +45,28 @@ static void display_help()
         exit(EXIT_SUCCESS);
 }
 
+static void display_version()
+{
+        printf("%s version %s\n", PROGRAM_NAME, PROGRAM_VERSION);
+        exit(EXIT_SUCCESS);
+}
+
 int main(int argc, char **argv)
 {
-        int c;
-        char *arg;
+        char *sigstr = DEFAULT_SIGNAL;
+        int sig;
 
-        while ((c = getopt_long(argc, argv, "+s:h", longopts, NULL)) != -1) {
+        int c;
+        while ((c = getopt_long(argc, argv, "+s:hv", longopts, NULL)) != -1) {
                 switch (c) {
                 case 's':
-                        arg = optarg;
+                        sigstr = optarg;
                         break;
                 case 'h':
                         display_help();
+                        break;
+                case 'v':
+                        display_version();
                         break;
                 case '?':
                         return EXIT_FAILURE;
@@ -62,7 +75,9 @@ int main(int argc, char **argv)
                 }
         }
 
-        printf("%s\n", arg);
+        sig = parse_signal(sigstr);
+
+        printf("%s -%d\n", sigstr, sig);
 
         return EXIT_SUCCESS;
 }

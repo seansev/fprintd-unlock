@@ -11,6 +11,8 @@ project (
 	],
 )
 
+add_project_arguments('-D_GNU_SOURCE', language: 'c')
+
 basu = dependency('basu')
 scdoc = find_program('scdoc', required: get_option('man-pages'))
 
@@ -40,6 +42,7 @@ dependencies = [
 
 sources = [
 	'main.c',
+	'signum.c',
 ]
 
 executable(
