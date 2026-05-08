@@ -47,7 +47,7 @@ static void display_help()
 
 static void display_version()
 {
-        printf("%s version %s\n", PROGRAM_NAME, PROGRAM_VERSION);
+        printf("%s: v%s\n", PROGRAM_NAME, PROGRAM_VERSION);
         exit(EXIT_SUCCESS);
 }
 
