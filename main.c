@@ -21,10 +21,12 @@
  * SOFTWARE.
 */
 
+#include <fcntl.h>
 #include <getopt.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #include "config.h"
@@ -37,11 +39,45 @@ static struct option longopts[] = {
         {0},
 };
 
+const char usage[] =
+        "\n"
+        "Usage:\n  " PROGRAM_NAME " [options...] [--] [locker [args...]]\n"
+        "\n"
+        "Spawn a program, then send a signal when a valid fingerprint is read.\n"
+        "\n"
+        "Options:\n"
+        "  -s, --signal <signal>\n"
+        "    Set the signal to be passed when fingerprint verification succeeds.\n\n"
+        "  -h, --help\n"
+        "    Display this help message.\n\n"
+        "  -v, --version\n"
+        "    Display the program version.\n\n"
+        "For more details, see " PROGRAM_NAME "(1).\n"
+        "\n";
+
 static void display_help()
 {
-        execlp("man", "man", PROGRAM_NAME, NULL);
-        /* exec failed */
-        printf("See `man %s'.\n", PROGRAM_NAME);
+        pid_t pid;
+        int status;
+        int null_fd;
+
+        pid = fork();
+        if (pid == 0) {
+                /* hide stderr */
+                null_fd = open("/dev/null", O_WRONLY);
+                if (null_fd == -1)
+                        exit(EXIT_FAILURE);
+                dup2(null_fd, STDERR_FILENO);
+                /* open manpage */
+                execlp("man", "man", PROGRAM_NAME, NULL);
+                exit(EXIT_FAILURE);
+        }
+
+        waitpid(pid, &status, 0);
+
+        if (WIFEXITED(status) && WEXITSTATUS(status) != EXIT_SUCCESS)
+                fprintf(stderr, "%s", usage);
+
         exit(EXIT_SUCCESS);
 }
 
