@@ -14,6 +14,14 @@ project (
 basu = dependency('basu')
 scdoc = find_program('scdoc', required: get_option('man-pages'))
 
+conf_data = configuration_data()
+conf_data.set_quoted('PROGRAM_NAME', meson.project_name())
+
+configure_file(
+	output: 'config.h',
+	configuration: conf_data,
+)
+
 dependencies = [
 	basu,
 ]
