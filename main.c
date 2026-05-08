@@ -65,9 +65,8 @@ static void display_help()
         if (pid == 0) {
                 /* hide stderr */
                 null_fd = open("/dev/null", O_WRONLY);
-                if (null_fd == -1)
-                        exit(EXIT_FAILURE);
-                dup2(null_fd, STDERR_FILENO);
+                if (null_fd != -1)
+                        dup2(null_fd, STDERR_FILENO);
                 /* open manpage */
                 execlp("man", "man", PROGRAM_NAME, NULL);
                 exit(EXIT_FAILURE);
@@ -75,7 +74,10 @@ static void display_help()
 
         waitpid(pid, &status, 0);
 
-        if (WIFEXITED(status) && WEXITSTATUS(status) != EXIT_SUCCESS)
+        if (!WIFEXITED(status))
+                exit(EXIT_FAILURE);
+
+        if (WEXITSTATUS(status) != EXIT_SUCCESS)
                 fprintf(stderr, "%s", usage);
 
         exit(EXIT_SUCCESS);
