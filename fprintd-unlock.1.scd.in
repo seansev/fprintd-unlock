@@ -6,7 +6,7 @@
 
 # SYNOPSIS
 
-*@program-name@* [*-s* _signal_] [*--*] [_program_ [_args..._]]
+*@program-name@* [_options..._] [*--*] [_program_ [_args..._]]
 
 Spawns a program, then sends a signal when a valid fingerprint is read.
 
@@ -17,9 +17,15 @@ Spawns a program, then sends a signal when a valid fingerprint is read.
 	detected. It may be given as a name or a number. Defaults to
 	*@default-signal@*.
 
+*-h, --help*
+	Display a help message, or this manpage if available.
+
+*-v, --version*
+	Display the program version.
+
 *--* <program> <args>
-	The command to execute once fprint is ready. Separated from other args
-	by the *--* delimiter, if needed. Defaults to *@default-locker@*.
+	The command to execute once fprint is ready. Optionally separated from
+	other args by the *--* delimiter. Defaults to *@default-locker@*.
 
 # SIGNALS
 
