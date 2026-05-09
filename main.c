@@ -39,7 +39,12 @@ static struct option longopts[] = {
         {0},
 };
 
-const char usage[] =
+static char *default_argv[] = {
+        DEFAULT_LOCKER,
+        NULL,
+};
+
+static const char usage[] =
         "\n"
         "Usage:\n  " PROGRAM_NAME " [options...] [--] [locker [args...]]\n"
         "\n"
@@ -93,6 +98,7 @@ int main(int argc, char **argv)
 {
         char *sigstr = DEFAULT_SIGNAL;
         int sig;
+        char **locker_argv = default_argv;
 
         int c;
         while ((c = getopt_long(argc, argv, "+s:hv", longopts, NULL)) != -1) {
@@ -114,8 +120,29 @@ int main(int argc, char **argv)
         }
 
         sig = parse_signal(sigstr);
+        if (sig == 0) {
+                fprintf(stderr, "Error: Invalid signal '%s' provided.", sigstr);
+                return EXIT_FAILURE;
+        }
+
+        if (optind < argc)
+                locker_argv = &argv[optind];
 
         printf("%s -%d\n", sigstr, sig);
+
+        pid_t pid;
+        int status;
+
+        pid = fork();
+        if (pid == 0) {
+                execvp(locker_argv[0], locker_argv);
+                exit(EXIT_FAILURE);
+        }
+
+        waitpid(pid, &status, 0);
+
+        if (WIFEXITED(status))
+                printf("Code: %d\n", WEXITSTATUS(status));
 
         return EXIT_SUCCESS;
 }
