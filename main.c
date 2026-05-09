@@ -26,6 +26,7 @@
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -124,11 +125,10 @@ int main(int argc, char **argv)
                 fprintf(stderr, "Error: Invalid signal '%s' provided.", sigstr);
                 return EXIT_FAILURE;
         }
+        printf("Using signal %d. (SIG%s)\n", sig, sigabbrev_np(sig));
 
         if (optind < argc)
                 locker_argv = &argv[optind];
-
-        printf("%s -%d\n", sigstr, sig);
 
         pid_t pid;
         int status;
