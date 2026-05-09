@@ -21,12 +21,16 @@
  * SOFTWARE.
 */
 
+#include <assert.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <getopt.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/epoll.h>
+#include <sys/signalfd.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -101,6 +105,7 @@ int main(int argc, char **argv)
         int sig;
         char **locker_argv = default_argv;
 
+        /* getopt */
         int c;
         while ((c = getopt_long(argc, argv, "+s:hv", longopts, NULL)) != -1) {
                 switch (c) {
@@ -120,6 +125,7 @@ int main(int argc, char **argv)
                 }
         }
 
+        /* get signal value */
         sig = parse_signal(sigstr);
         if (sig == 0) {
                 fprintf(stderr, "Error: Invalid signal '%s' provided.", sigstr);
@@ -127,22 +133,50 @@ int main(int argc, char **argv)
         }
         printf("Using signal %d. (SIG%s)\n", sig, sigabbrev_np(sig));
 
+        /* get argv for locker */
         if (optind < argc)
                 locker_argv = &argv[optind];
 
-        pid_t pid;
-        int status;
+        /* block signals */
+        sigset_t sigset;
 
-        pid = fork();
-        if (pid == 0) {
-                execvp(locker_argv[0], locker_argv);
-                exit(EXIT_FAILURE);
+        assert(sigemptyset(&sigset) != -1);
+        assert(sigaddset(&sigset, SIGCHLD) != -1);
+        
+        if (sigprocmask(SIG_BLOCK, &sigset, NULL) == -1) {
+                perror(strerror(errno));
+                return EXIT_FAILURE;
         }
 
-        waitpid(pid, &status, 0);
+        int sfd = signalfd(-1, &sigset, SFD_CLOEXEC | SFD_NONBLOCK);
+        if (sfd == -1) {
+                perror(strerror(errno));
+                return EXIT_FAILURE;
+        }
+
+        /* fork */
+        pid_t locker_pid;
+        int status;
+
+        locker_pid = fork();
+        if (locker_pid < 0) {
+                perror(strerror(errno));
+                return EXIT_FAILURE;
+        }
+        if (locker_pid == 0) {
+                sigprocmask(SIG_UNBLOCK, &sigset, NULL);
+                execvp(locker_argv[0], locker_argv);
+                _exit(127);
+        }
+
+        // TODO: epoll and waitpid
+
+        waitpid(locker_pid, &status, 0);
 
         if (WIFEXITED(status))
                 printf("Code: %d\n", WEXITSTATUS(status));
+
+        close(sfd);
 
         return EXIT_SUCCESS;
 }
