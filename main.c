@@ -192,21 +192,7 @@ int main(int argc, char **argv)
                 exit_if_unlock(EXIT_FAILURE);
         }
 
-        /* register signalfd */
-        int sfd = signalfd(-1, &sigset, SFD_CLOEXEC);
-        if (sfd == -1) {
-                fprintf(stderr, "signalfd() error: %s\n", strerror(errno));
-                /*
-                 * It's guaranteed that a broken signalfd will cause a crash
-                 * later, but it's more important to continue and launch the
-                 * locker regardless.
-                 */
-                exit_if_unlock(EXIT_FAILURE);
-        }
-
-        /* fork */
-        pid_t locker_pid;
-
+        /* fork locker */
         locker_pid = fork();
         if (locker_pid < 0) {
                 fprintf(stderr, "fork() error: %s\n", strerror(errno));
@@ -217,6 +203,13 @@ int main(int argc, char **argv)
                 execvp(locker_argv[0], locker_argv);
                 fprintf(stderr, "exec() error: %s\n", strerror(errno));
                 _exit(127);
+        }
+
+        /* register signalfd */
+        int sfd = signalfd(-1, &sigset, SFD_CLOEXEC);
+        if (sfd == -1) {
+                fprintf(stderr, "signalfd() error: %s\n", strerror(errno));
+                exit_unlock(EXIT_FAILURE);
         }
 
         // TODO: epoll
