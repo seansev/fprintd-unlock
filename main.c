@@ -26,6 +26,7 @@
 #include <fcntl.h>
 #include <getopt.h>
 #include <signal.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -37,16 +38,15 @@
 #include "config.h"
 #include "signum.h"
 
+/*
+ * Arguments
+ */
 static struct option longopts[] = {
         {"signal", required_argument, NULL, 's'},
+        {"error-unlock", no_argument, NULL, 'e'},
         {"help", no_argument, NULL, 'h'},
         {"version", no_argument, NULL, 'v'},
         {0},
-};
-
-static char *default_argv[] = {
-        DEFAULT_LOCKER,
-        NULL,
 };
 
 static const char usage[] =
@@ -57,14 +57,36 @@ static const char usage[] =
         "\n"
         "Options:\n"
         "  -s, --signal <signal>\n"
-        "    Set the signal to be passed when fingerprint verification succeeds.\n\n"
+        "    Set the signal to be passed when fingerprint verification"
+                " succeeds.\n"
+        "\n"
+        "  -e, --error-unlock\n"
+        "    Unlock in the event of an error. Considered insecure.\n"
+        "\n"
         "  -h, --help\n"
-        "    Display this help message.\n\n"
+        "    Display this help message.\n"
+        "\n"
         "  -v, --version\n"
-        "    Display the program version.\n\n"
+        "    Display the program version.\n"
+        "\n"
         "For more details, see " PROGRAM_NAME "(1).\n"
         "\n";
 
+/*
+ * Globals
+ */
+static char *default_argv[] = {
+        DEFAULT_LOCKER,
+        NULL,
+};
+
+static int sig = -1;
+static bool error_unlock = false;
+static pid_t locker_pid = -1;
+
+/*
+ * Helpers
+ */
 static void display_help()
 {
         pid_t pid;
@@ -99,18 +121,38 @@ static void display_version()
         exit(EXIT_SUCCESS);
 }
 
+static void exit_unlock(int status)
+{
+        if (error_unlock && locker_pid != -1 && sig != -1) {
+                kill(locker_pid, sig);
+                waitpid(locker_pid, NULL, WNOHANG);
+        }
+        exit(status);
+}
+
+static void exit_if_unlock(int status)
+{
+        if (error_unlock)
+                exit(status);
+}
+
+/*
+ * Main
+ */
 int main(int argc, char **argv)
 {
         char *sigstr = DEFAULT_SIGNAL;
-        int sig;
-        char **locker_argv = default_argv;
+        char **locker_argv;
 
         /* getopt */
         int c;
-        while ((c = getopt_long(argc, argv, "+s:hv", longopts, NULL)) != -1) {
+        while ((c = getopt_long(argc, argv, "+s:ehv", longopts, NULL)) != -1) {
                 switch (c) {
                 case 's':
                         sigstr = optarg;
+                        break;
+                case 'e':
+                        error_unlock = true;
                         break;
                 case 'h':
                         display_help();
@@ -128,12 +170,14 @@ int main(int argc, char **argv)
         /* get signal value */
         sig = parse_signal(sigstr);
         if (sig == 0) {
-                fprintf(stderr, "Error: Invalid signal '%s' provided.", sigstr);
-                return EXIT_FAILURE;
+                fprintf(stderr, "Error: Invalid signal '%s' provided.\n", sigstr);
+                exit_if_unlock(EXIT_FAILURE);
+                sig = parse_signal(DEFAULT_SIGNAL);
         }
         printf("Using signal %d. (SIG%s)\n", sig, sigabbrev_np(sig));
 
         /* get argv for locker */
+        locker_argv = default_argv;
         if (optind < argc)
                 locker_argv = &argv[optind];
 
@@ -145,14 +189,19 @@ int main(int argc, char **argv)
         
         if (sigprocmask(SIG_BLOCK, &sigset, NULL) == -1) {
                 fprintf(stderr, "sigprocmask() error: %s\n", strerror(errno));
-                return EXIT_FAILURE;
+                exit_if_unlock(EXIT_FAILURE);
         }
 
         /* register signalfd */
         int sfd = signalfd(-1, &sigset, SFD_CLOEXEC);
         if (sfd == -1) {
                 fprintf(stderr, "signalfd() error: %s\n", strerror(errno));
-                return EXIT_FAILURE;
+                /*
+                 * It's guaranteed that a broken signalfd will cause a crash
+                 * later, but it's more important to continue and launch the
+                 * locker regardless.
+                 */
+                exit_if_unlock(EXIT_FAILURE);
         }
 
         /* fork */
@@ -166,6 +215,7 @@ int main(int argc, char **argv)
         if (locker_pid == 0) {
                 sigprocmask(SIG_UNBLOCK, &sigset, NULL);
                 execvp(locker_argv[0], locker_argv);
+                fprintf(stderr, "exec() error: %s\n", strerror(errno));
                 _exit(127);
         }
 
@@ -183,7 +233,7 @@ int main(int argc, char **argv)
                                 fprintf(stderr, "read() error: %s\n", strerror(errno));
                         else
                                 fprintf(stderr, "read() error\n");
-                        exit(EXIT_FAILURE);
+                        exit_unlock(EXIT_FAILURE);
                 }
 
                 if (fdsi.ssi_signo == SIGCHLD) {
