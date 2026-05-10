@@ -105,10 +105,7 @@ static void display_help()
 
         waitpid(pid, &status, 0);
 
-        if (!WIFEXITED(status))
-                exit(EXIT_FAILURE);
-
-        if (WEXITSTATUS(status) != EXIT_SUCCESS)
+        if (WIFEXITED(status) && WEXITSTATUS(status) != EXIT_SUCCESS)
                 fprintf(stderr, "%s", usage);
 
         exit(EXIT_SUCCESS);
@@ -122,10 +119,8 @@ static void display_version()
 
 static void exit_unlock(int status)
 {
-        if (error_unlock && locker_pid != -1 && sig != -1) {
+        if (error_unlock && locker_pid != -1 && sig != -1)
                 kill(locker_pid, sig);
-                waitpid(locker_pid, NULL, WNOHANG);
-        }
         exit(status);
 }
 
