@@ -27,11 +27,6 @@ Spawns a program, then sends a signal when a valid fingerprint is read.
 	The command to execute once fprint is ready. Optionally separated from
 	other args by the *--* delimiter. Defaults to *@default-locker@*.
 
-# SIGNALS
-
-*SIGUSR1*
-	Sends the configured unlock signal to the child process.
-
 # AUTHORS
 
 Written by Sean S. Williams <mail@seansev.com>.
