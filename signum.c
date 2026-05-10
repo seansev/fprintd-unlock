@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
@@ -24,11 +25,15 @@ int signalnumber(const char *name)
 int parse_signal(const char *str)
 {
         int sig;
+        char *endptr;
 
-        sig = atoi(str);
-        if (sig > 0 && sig < NSIG)
-                return sig;
+        if (!str || !*str)
+                return 0;
 
-        sig = signalnumber(str);
+        errno = 0;
+        sig = (int)strtol(str, &endptr, 10);
+        if (errno != 0 || *endptr != '\0' || sig <= 0 || sig >= NSIG)
+                sig = signalnumber(str);
+
         return sig;
 }
