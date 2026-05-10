@@ -144,23 +144,23 @@ int main(int argc, char **argv)
         assert(sigaddset(&sigset, SIGCHLD) != -1);
         
         if (sigprocmask(SIG_BLOCK, &sigset, NULL) == -1) {
-                perror(strerror(errno));
+                fprintf(stderr, "sigprocmask() error: %s\n", strerror(errno));
                 return EXIT_FAILURE;
         }
 
-        int sfd = signalfd(-1, &sigset, SFD_CLOEXEC | SFD_NONBLOCK);
+        /* register signalfd */
+        int sfd = signalfd(-1, &sigset, SFD_CLOEXEC);
         if (sfd == -1) {
-                perror(strerror(errno));
+                fprintf(stderr, "signalfd() error: %s\n", strerror(errno));
                 return EXIT_FAILURE;
         }
 
         /* fork */
         pid_t locker_pid;
-        int status;
 
         locker_pid = fork();
         if (locker_pid < 0) {
-                perror(strerror(errno));
+                fprintf(stderr, "fork() error: %s\n", strerror(errno));
                 return EXIT_FAILURE;
         }
         if (locker_pid == 0) {
@@ -169,12 +169,35 @@ int main(int argc, char **argv)
                 _exit(127);
         }
 
-        // TODO: epoll and waitpid
+        // TODO: epoll
 
-        waitpid(locker_pid, &status, 0);
+        /* non-multiplexed read() approach */
+        ssize_t size;
+        struct signalfd_siginfo fdsi;
+        int status = 0;
+
+        for (;;) {
+                size = read(sfd, &fdsi, sizeof(fdsi));
+                if (size != sizeof(fdsi)) {
+                        if (size == -1)
+                                fprintf(stderr, "read() error: %s\n", strerror(errno));
+                        else
+                                fprintf(stderr, "read() error\n");
+                        exit(EXIT_FAILURE);
+                }
+
+                if (fdsi.ssi_signo == SIGCHLD) {
+                        pid_t wpid = waitpid(locker_pid, &status, WNOHANG);
+                        if (wpid > 0)
+                                break;
+                }
+        }
 
         if (WIFEXITED(status))
                 printf("Code: %d\n", WEXITSTATUS(status));
+
+        if (WIFSIGNALED(status))
+                printf("Signal: %d\n", WTERMSIG(status));
 
         close(sfd);
 
