@@ -21,7 +21,6 @@
  * SOFTWARE.
 */
 
-#include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <getopt.h>
@@ -184,8 +183,8 @@ int main(int argc, char **argv)
         /* block signals */
         sigset_t sigset;
 
-        assert(sigemptyset(&sigset) != -1);
-        assert(sigaddset(&sigset, SIGCHLD) != -1);
+        sigemptyset(&sigset);
+        sigaddset(&sigset, SIGCHLD);
         
         if (sigprocmask(SIG_BLOCK, &sigset, NULL) == -1) {
                 fprintf(stderr, "sigprocmask() error: %s\n", strerror(errno));
