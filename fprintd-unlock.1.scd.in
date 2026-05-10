@@ -17,13 +17,18 @@ Spawns a program, then sends a signal when a valid fingerprint is read.
 	detected. It may be given as a name or a number. Defaults to
 	*@default-signal@*.
 
+*-e, --error-unlock*
+	Trigger an unlock if an error occurs, such as if the fingerprint reader
+	couldn't be loaded. This setting is NOT considered secure. Intended only
+	for use during initial setup.
+
 *-h, --help*
 	Display a help message, or this manpage if available.
 
 *-v, --version*
 	Display the program version.
 
-*--* <program> <args>
+*--* <program> [args]
 	The command to execute once fprint is ready. Optionally separated from
 	other args by the *--* delimiter. Defaults to *@default-locker@*.
 
