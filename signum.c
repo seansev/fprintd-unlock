@@ -6,14 +6,6 @@
 
 #include "signum.h"
 
-#if defined(HAVE_SYS_SIGNAME)
-        #define SIGABBREV(i) (sys_signame[i])
-#elif defined(HAVE_SIGABBREV_NP)
-        #define SIGABBREV(i) (sigabbrev_np(i))
-#else
-        #define SIGABBREV(i) (NULL)
-#endif
-
 /* Converted from NetBSD's signalnumber(3) */
 int signalnumber(const char *name)
 {

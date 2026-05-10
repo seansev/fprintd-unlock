@@ -169,7 +169,11 @@ int main(int argc, char **argv)
                 exit_if_errunlock(EXIT_FAILURE);
                 sig = parse_signal(DEFAULT_SIGNAL);
         }
-        printf("Using signal %d. (SIG%s)\n", sig, sigabbrev_np(sig));
+        const char *abbrev = SIGABBREV(sig);
+        if (abbrev)
+                printf("Using signal %d. (SIG%s)\n", sig, abbrev);
+        else
+                printf("Using signal %d.\n", sig);
 
         /* get argv for locker */
         locker_argv = default_argv;
