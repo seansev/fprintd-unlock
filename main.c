@@ -79,9 +79,9 @@ static char *default_argv[] = {
         NULL,
 };
 
-static int sig = -1;
-static bool error_unlock = false;
-static pid_t locker_pid = -1;
+static int sig;
+static bool error_unlock;
+static pid_t locker_pid;
 
 /*
  * Helpers
@@ -119,7 +119,7 @@ static void display_version()
 
 static void exit_unlock(int status)
 {
-        if (error_unlock && locker_pid != -1 && sig != -1)
+        if (error_unlock)
                 kill(locker_pid, sig);
         exit(status);
 }
@@ -137,6 +137,8 @@ int main(int argc, char **argv)
 {
         char *sigstr = DEFAULT_SIGNAL;
         char **locker_argv;
+
+        error_unlock = false;
 
         /* getopt */
         int c;
