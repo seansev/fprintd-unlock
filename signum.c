@@ -26,7 +26,7 @@ int parse_signal(const char *str)
         int sig;
 
         sig = atoi(str);
-        if (sig > 0 && sig <= NSIG)
+        if (sig > 0 && sig < NSIG)
                 return sig;
 
         sig = signalnumber(str);
