@@ -41,6 +41,8 @@ endif
 have_signalfd = cc.has_header('sys/signalfd.h')
 if not have_signalfd
 	epoll_shim = dependency('epoll-shim', required: true)
+else
+	epoll_shim = dependency('', required: false)
 endif
 
 
@@ -69,6 +71,7 @@ configure_file(
 
 dependencies = [
 	sdbus,
+	epoll_shim,
 ]
 
 sources = [
