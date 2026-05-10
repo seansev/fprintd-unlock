@@ -196,6 +196,56 @@ static void reap_locker(void)
         }
 }
 
+static int init_bus(void)
+{
+        sd_bus_error error = SD_BUS_ERROR_NULL;
+        sd_bus_message *reply = NULL;
+        const char *path;
+        int ret;
+
+        ret = sd_bus_default_system(&bus);
+        if (ret < 0) {
+                print_error("sd_bus_default_system()", -ret);
+                goto err;
+        }
+
+        ret = sd_bus_call_method(bus, FPRINT_BUS, MGR_PATH, MGR_IFACE,
+                        "GetDefaultDevice", &error, &reply, "");
+        if (ret < 0) {
+                print_error("GetDefaultDevice", -ret);
+                goto err;
+        }
+
+        ret = sd_bus_message_read(reply, "o", &path);
+        if (ret < 0) {
+                print_error("GetDefaultDevice reply", -ret);
+                goto err;
+        }
+
+        device_path = strdup(path);
+        if (device_path == NULL) {
+                print_error("Device path strdup()", errno);
+                goto err;
+        }
+
+        sd_bus_message_unref(reply);
+        sd_bus_error_free(&error);
+        return 0;
+
+err:
+        sd_bus_message_unref(reply);
+        sd_bus_error_free(&error);
+        return -1;
+}
+
+static void close_bus(void)
+{
+        free(device_path);
+        device_path = NULL;
+        sd_bus_unref(bus);
+        bus = NULL;
+}
+
 /*
  * Main
  */
@@ -271,6 +321,10 @@ int main(int argc, char **argv)
                 _exit(127);
         }
 
+        /* initialize dbus */
+        if (init_bus() == -1)
+                exit_unlock(EXIT_FAILURE);
+
         /* poll */
         exit_code = 0;
         locker_alive = true;
@@ -302,6 +356,7 @@ int main(int argc, char **argv)
                 }
         }
 
+        close_bus();
         close(sig_pipe[0]);
         close(sig_pipe[1]);
 

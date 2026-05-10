@@ -69,6 +69,7 @@ dependencies = [
 sources = [
 	'main.c',
 	'signum.c',
+	'util.c',
 ]
 
 fpu_inc = include_directories('include')
