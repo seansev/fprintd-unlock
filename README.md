@@ -5,7 +5,7 @@ This program is a wrapper for Linux screen lockers (namely `swaylock`) which ena
 ## Dependencies
 
 - `fprintd`: D-Bus daemon for interfacing with fingerprint hardware.
-- `sd-bus`: D-Bus client. Currently this is provided via a hard dependency on `basu`, but can theoretically be provided by `systemd` or `elogind` as well. This will be fixed in the future.
+- `libsystemd` | `libelogind` | `basu`: D-Bus client via `sd-bus`. Any of these three libraries will suffice, and can optionally be chosen between with the `sd-bus-provider` build option.
 - `meson` & `ninja`: Build system.
 - `scdoc` (Optional): For generating manpages.
 
