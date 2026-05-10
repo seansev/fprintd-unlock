@@ -11,8 +11,9 @@ project (
 	],
 )
 
-add_project_arguments('-D_GNU_SOURCE', language: 'c')
-add_project_arguments('-D_POSIX_C_SOURCE', language: 'c')
+cc = meson.get_compiler('c')
+
+
 
 scdoc = find_program('scdoc', required: get_option('man-pages'))
 
@@ -22,6 +23,24 @@ else
 	sdbus = dependency(get_option('sd-bus-provider'))
 endif
 add_project_arguments('-DHAVE_' + sdbus.name().to_upper(), language: 'c')
+
+
+
+add_project_arguments('-D_POSIX_C_SOURCE', language: 'c')
+
+bsd_args = ['-D_DEFAULT_SOURCE', '-D_BSD_SOURCE']
+linux_args = ['-D_GNU_SOURCE']
+if cc.has_header_symbol('signal.h', 'sys_signame', args: bsd_args)
+	add_project_arguments('-DHAVE_SYS_SIGNAME', language: 'c')
+	add_project_arguments(bsd_args, language: 'c')
+elif cc.has_function('sigabbrev_np', args: linux_args, prefix: '#include <string.h>')
+	add_project_arguments('-DHAVE_SIGABBREV_NP', language: 'c')
+	add_project_arguments(linux_args, language: 'c')
+else
+	warning('Neither sys_signame nor sigabbrev_np is available. Signal name lookup will be disabled, requiring signal numbers only.')
+endif
+
+
 
 program_name = get_option('program-name')
 if program_name == ''
@@ -43,6 +62,8 @@ configure_file(
 	configuration: conf_data,
 )
 
+
+
 dependencies = [
 	sdbus,
 ]
@@ -61,6 +82,8 @@ executable(
 	include_directories: [fpu_inc],
 	install: true,
 )
+
+
 
 if scdoc.found()
 	man_scd = configure_file(
