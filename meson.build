@@ -14,8 +14,14 @@ project (
 add_project_arguments('-D_GNU_SOURCE', language: 'c')
 add_project_arguments('-D_POSIX_C_SOURCE', language: 'c')
 
-basu = dependency('basu')
 scdoc = find_program('scdoc', required: get_option('man-pages'))
+
+if get_option('sd-bus-provider') == 'auto'
+	sdbus = dependency('libsystemd', 'libelogind', 'basu')
+else
+	sdbus = dependency(get_option('sd-bus-provider'))
+endif
+add_project_arguments('-DHAVE_' + sdbus.name().to_upper(), language: 'c')
 
 program_name = get_option('program-name')
 if program_name == ''
@@ -32,13 +38,13 @@ conf_data.set('default-signal', default_signal)
 conf_data.set('default-locker', default_locker)
 
 configure_file(
-	input: 'config.h.in',
+	input: 'include/config.h.in',
 	output: 'config.h',
 	configuration: conf_data,
 )
 
 dependencies = [
-	basu,
+	sdbus,
 ]
 
 sources = [
@@ -46,10 +52,13 @@ sources = [
 	'signum.c',
 ]
 
+fpu_inc = include_directories('include')
+
 executable(
 	program_name,
 	sources,
 	dependencies: dependencies,
+	include_directories: [fpu_inc],
 	install: true,
 )
 
