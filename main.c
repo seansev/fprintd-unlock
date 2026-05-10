@@ -124,7 +124,7 @@ static void exit_unlock(int status)
         exit(status);
 }
 
-static void exit_if_unlock(int status)
+static void exit_if_errunlock(int status)
 {
         if (error_unlock)
                 exit(status);
@@ -165,7 +165,7 @@ int main(int argc, char **argv)
         sig = parse_signal(sigstr);
         if (sig == 0) {
                 fprintf(stderr, "Error: Invalid signal '%s' provided.\n", sigstr);
-                exit_if_unlock(EXIT_FAILURE);
+                exit_if_errunlock(EXIT_FAILURE);
                 sig = parse_signal(DEFAULT_SIGNAL);
         }
         printf("Using signal %d. (SIG%s)\n", sig, sigabbrev_np(sig));
@@ -183,7 +183,7 @@ int main(int argc, char **argv)
         
         if (sigprocmask(SIG_BLOCK, &sigset, NULL) == -1) {
                 fprintf(stderr, "sigprocmask() error: %s\n", strerror(errno));
-                exit_if_unlock(EXIT_FAILURE);
+                exit_if_errunlock(EXIT_FAILURE);
         }
 
         /* fork locker */
