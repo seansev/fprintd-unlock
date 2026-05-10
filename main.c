@@ -35,7 +35,9 @@
 #include <unistd.h>
 
 #include "config.h"
+#include "dbus.h"
 #include "signum.h"
+#include "util.h"
 
 /*
  * Arguments
@@ -88,6 +90,9 @@ static bool locker_alive;
 
 static int sig_pipe[2] = {-1, -1};
 static volatile sig_atomic_t got_sigchld = 0;
+
+static sd_bus *bus;
+static char *device_path;
 
 /*
  * Helpers
@@ -239,13 +244,13 @@ int main(int argc, char **argv)
 
         /* self pipe */
         if (pipe2(sig_pipe, O_CLOEXEC | O_NONBLOCK) == -1) {
-                fprintf(stderr, "pipe2() error: %s\n", strerror(errno));
+                print_error("pipe2()", errno);
                 exit_if_errunlock(EXIT_FAILURE);
         }
 
         /* set up signals */
         if (register_signal_handlers() == -1) {
-                perror("error registering signal handlers");
+                print_error("Signal handler registration", 0);
                 exit_if_errunlock(EXIT_FAILURE);
         }
 
@@ -257,12 +262,12 @@ int main(int argc, char **argv)
         /* fork locker */
         locker_pid = fork();
         if (locker_pid < 0) {
-                fprintf(stderr, "fork() error: %s\n", strerror(errno));
+                print_error("fork()", errno);
                 return EXIT_FAILURE;
         }
         if (locker_pid == 0) {
                 execvp(locker_argv[0], locker_argv);
-                fprintf(stderr, "exec() error: %s\n", strerror(errno));
+                print_error("exec()", errno);
                 _exit(127);
         }
 
@@ -283,7 +288,7 @@ int main(int argc, char **argv)
                 if (n == -1) {
                         if (errno == EINTR)
                                 continue;
-                        fprintf(stderr, "poll() error: %s\n", strerror(errno));
+                        print_error("poll()", errno);
                         exit_unlock(EXIT_FAILURE);
                 }
 
