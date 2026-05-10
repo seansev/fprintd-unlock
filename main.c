@@ -146,12 +146,12 @@ static void drain_pipe(int pipe_fds[2])
 /*
  * Callbacks
  */
-static void on_sigchld(int sig)
+static void on_signal(int sig)
 {
         (void)sig;
         got_sigchld = 1;
         int errno_save = errno;
-        write(sig_pipe[1], "1", 1);
+        write(sig_pipe[1], &sig, sizeof(sig));
         errno = errno_save;
 }
 
@@ -161,12 +161,14 @@ static void on_sigchld(int sig)
 static int register_signal_handlers(void)
 {
         struct sigaction sa = {
-                .sa_handler = on_sigchld,
+                .sa_handler = on_signal,
                 .sa_flags = SA_RESTART | SA_NOCLDSTOP,
         };
         sigemptyset(&sa.sa_mask);
 
-        if (sigaction(SIGCHLD, &sa, NULL) < 0)
+        if (    sigaction(SIGCHLD, &sa, NULL) < 0
+             || sigaction(SIGINT, &sa, NULL) < 0
+             || sigaction(SIGTERM, &sa, NULL) < 0)
                 return -1;
 
         return 0;
@@ -269,12 +271,15 @@ int main(int argc, char **argv)
         locker_alive = true;
 
         while (locker_alive) {
-                struct pollfd pfd = {
-                        .fd = sig_pipe[0],
-                        .events = POLLIN,
+                enum {PFD_SIGNAL, PFD_BUS, PFD_COUNT};
+                struct pollfd pfds[PFD_COUNT] = {
+                        [PFD_SIGNAL] = {
+                                .fd = sig_pipe[0],
+                                .events = POLLIN,
+                        },
                 };
 
-                int n = poll(&pfd, 1, -1);
+                int n = poll(pfds, PFD_COUNT, -1);
                 if (n == -1) {
                         if (errno == EINTR)
                                 continue;
@@ -282,7 +287,7 @@ int main(int argc, char **argv)
                         exit_unlock(EXIT_FAILURE);
                 }
 
-                if (pfd.revents & POLLIN) {
+                if (pfds[PFD_SIGNAL].revents & POLLIN) {
                         drain_pipe(sig_pipe);
                 }
 
