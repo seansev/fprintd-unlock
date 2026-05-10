@@ -26,8 +26,6 @@ add_project_arguments('-DHAVE_' + sdbus.name().to_upper(), language: 'c')
 
 
 
-add_project_arguments('-D_POSIX_C_SOURCE', language: 'c')
-
 bsd_args = ['-D_DEFAULT_SOURCE', '-D_BSD_SOURCE']
 linux_args = ['-D_GNU_SOURCE']
 if cc.has_header_symbol('signal.h', 'sys_signame', args: bsd_args)
@@ -38,6 +36,11 @@ elif cc.has_function('sigabbrev_np', args: linux_args, prefix: '#include <string
 	add_project_arguments(linux_args, language: 'c')
 else
 	warning('Neither sys_signame nor sigabbrev_np is available. Signal name lookup will be disabled, requiring signal numbers only.')
+endif
+
+have_signalfd = cc.has_header('sys/signalfd.h')
+if not have_signalfd
+	epoll_shim = dependency('epoll-shim', required: true)
 endif
 
 
