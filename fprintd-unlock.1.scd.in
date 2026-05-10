@@ -35,7 +35,8 @@ Spawns a program, then sends a signal when a valid fingerprint is read.
 # SIGNALS
 
 *SIGUSR1*
-	Sends the configured unlock signal to the child process.
+	Sends the configured unlock signal to the child process. Useful for
+	chaining wrappers like this one.
 
 # AUTHORS
 
