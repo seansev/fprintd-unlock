@@ -38,13 +38,6 @@ else
 	warning('Neither sys_signame nor sigabbrev_np is available. Signal name lookup will be disabled, requiring signal numbers only.')
 endif
 
-have_signalfd = cc.has_header('sys/signalfd.h')
-if not have_signalfd
-	epoll_shim = dependency('epoll-shim', required: true)
-else
-	epoll_shim = dependency('', required: false)
-endif
-
 
 
 program_name = get_option('program-name')
@@ -71,7 +64,6 @@ configure_file(
 
 dependencies = [
 	sdbus,
-	epoll_shim,
 ]
 
 sources = [

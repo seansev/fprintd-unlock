@@ -24,12 +24,13 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <getopt.h>
+#include <limits.h>
+#include <poll.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/signalfd.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -82,6 +83,9 @@ static int sig;
 static bool error_unlock;
 static pid_t locker_pid;
 
+static int sig_pipe[2] = {-1, -1};
+static volatile sig_atomic_t got_sigchld = 0;
+
 /*
  * Helpers
  */
@@ -130,6 +134,35 @@ static void exit_if_errunlock(int status)
 }
 
 /*
+ * Callbacks
+ */
+static void on_sigchld(int sig)
+{
+        (void)sig;
+        got_sigchld = 1;
+        int errno_save = errno;
+        write(sig_pipe[1], "1", 1);
+        errno = errno_save;
+}
+
+/*
+ * Stages
+ */
+static int register_signal_handlers(void)
+{
+        struct sigaction sa = {
+                .sa_handler = on_sigchld,
+                .sa_flags = SA_RESTART | SA_NOCLDSTOP,
+        };
+        sigemptyset(&sa.sa_mask);
+
+        if (sigaction(SIGCHLD, &sa, NULL) < 0)
+                return -1;
+
+        return 0;
+}
+
+/*
  * Main
  */
 int main(int argc, char **argv)
@@ -175,21 +208,22 @@ int main(int argc, char **argv)
         else
                 printf("Using signal %d.\n", sig);
 
+        /* self pipe */
+        if (pipe2(sig_pipe, O_CLOEXEC | O_NONBLOCK) == -1) {
+                fprintf(stderr, "pipe2() error: %s\n", strerror(errno));
+                exit_if_errunlock(EXIT_FAILURE);
+        }
+
+        /* set up signals */
+        if (register_signal_handlers() == -1) {
+                perror("error registering signal handlers");
+                exit_if_errunlock(EXIT_FAILURE);
+        }
+
         /* get argv for locker */
         locker_argv = default_argv;
         if (optind < argc)
                 locker_argv = &argv[optind];
-
-        /* block signals */
-        sigset_t sigset;
-
-        sigemptyset(&sigset);
-        sigaddset(&sigset, SIGCHLD);
-        
-        if (sigprocmask(SIG_BLOCK, &sigset, NULL) == -1) {
-                fprintf(stderr, "sigprocmask() error: %s\n", strerror(errno));
-                exit_if_errunlock(EXIT_FAILURE);
-        }
 
         /* fork locker */
         locker_pid = fork();
@@ -198,50 +232,55 @@ int main(int argc, char **argv)
                 return EXIT_FAILURE;
         }
         if (locker_pid == 0) {
-                sigprocmask(SIG_UNBLOCK, &sigset, NULL);
                 execvp(locker_argv[0], locker_argv);
                 fprintf(stderr, "exec() error: %s\n", strerror(errno));
                 _exit(127);
         }
 
-        /* register signalfd */
-        int sfd = signalfd(-1, &sigset, SFD_CLOEXEC);
-        if (sfd == -1) {
-                fprintf(stderr, "signalfd() error: %s\n", strerror(errno));
-                exit_unlock(EXIT_FAILURE);
-        }
+        /* poll */
+        int exit_code = 0;
+        bool locker_alive = true;
 
-        // TODO: epoll
+        while (locker_alive) {
+                struct pollfd pfd = {
+                        .fd = sig_pipe[0],
+                        .events = POLLIN,
+                };
 
-        /* non-multiplexed read() approach */
-        ssize_t size;
-        struct signalfd_siginfo fdsi;
-        int status = 0;
-
-        for (;;) {
-                size = read(sfd, &fdsi, sizeof(fdsi));
-                if (size != sizeof(fdsi)) {
-                        if (size == -1)
-                                fprintf(stderr, "read() error: %s\n", strerror(errno));
-                        else
-                                fprintf(stderr, "read() error\n");
+                int n = poll(&pfd, 1, -1);
+                if (n == -1) {
+                        if (errno == EINTR)
+                                continue;
+                        fprintf(stderr, "poll() error: %s\n", strerror(errno));
                         exit_unlock(EXIT_FAILURE);
                 }
 
-                if (fdsi.ssi_signo == SIGCHLD) {
-                        pid_t wpid = waitpid(locker_pid, &status, WNOHANG);
-                        if (wpid > 0)
-                                break;
+                if (pfd.revents & POLLIN) {
+                        char buf[PIPE_BUF];
+                        while (read(sig_pipe[0], buf, sizeof(buf)) > 0);
+                }
+
+                if (got_sigchld) {
+                        got_sigchld = 0;
+
+                        int status;
+                        pid_t pid = waitpid(locker_pid, &status, WNOHANG);
+                        if (pid == locker_pid) {
+                                locker_alive = false;
+                                if (WIFEXITED(status))
+                                        exit_code = WEXITSTATUS(status);
+                                else if (WIFSIGNALED(status))
+                                        exit_code = 128 + WTERMSIG(status);
+                        } else if (pid == -1 && errno != ECHILD) {
+                                fprintf(stderr, "waitpid() error: %s\n", strerror(errno));
+                        }
                 }
         }
 
-        if (WIFEXITED(status))
-                printf("Code: %d\n", WEXITSTATUS(status));
+        printf("Code: %d\n", exit_code);
+        
+        close(sig_pipe[0]);
+        close(sig_pipe[1]);
 
-        if (WIFSIGNALED(status))
-                printf("Signal: %d\n", WTERMSIG(status));
-
-        close(sfd);
-
-        return EXIT_SUCCESS;
+        return exit_code;
 }
