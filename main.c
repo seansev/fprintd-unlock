@@ -44,6 +44,7 @@
  */
 static struct option longopts[] = {
         {"signal", required_argument, NULL, 's'},
+        {"finger", required_argument, NULL, 'f'},
         {"error-unlock", no_argument, NULL, 'e'},
         {"help", no_argument, NULL, 'h'},
         {"version", no_argument, NULL, 'v'},
@@ -252,16 +253,20 @@ static void close_bus(void)
 int main(int argc, char **argv)
 {
         char *sigstr = DEFAULT_SIGNAL;
+        char *finger = "any";
         char **locker_argv;
 
         error_unlock = false;
 
         /* getopt */
         int c;
-        while ((c = getopt_long(argc, argv, "+s:ehv", longopts, NULL)) != -1) {
+        while ((c = getopt_long(argc, argv, "+s:f:ehv", longopts, NULL)) != -1) {
                 switch (c) {
                 case 's':
                         sigstr = optarg;
+                        break;
+                case 'f':
+                        finger = optarg;
                         break;
                 case 'e':
                         error_unlock = true;
@@ -278,6 +283,8 @@ int main(int argc, char **argv)
                         return EXIT_FAILURE;
                 }
         }
+
+        printf("Finger '%s' selected\n", finger);
 
         /* get signal value */
         send_sig = parse_signal(sigstr);
@@ -324,6 +331,8 @@ int main(int argc, char **argv)
         /* initialize dbus */
         if (init_bus() == -1)
                 exit_unlock(EXIT_FAILURE);
+
+        printf("Fprint device available at %s\n", device_path);
 
         /* poll */
         exit_code = 0;
