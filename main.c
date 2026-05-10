@@ -79,9 +79,12 @@ static char *default_argv[] = {
         NULL,
 };
 
-static int sig;
+static int send_sig;
 static bool error_unlock;
 static pid_t locker_pid;
+
+static int exit_code;
+static bool locker_alive;
 
 static int sig_pipe[2] = {-1, -1};
 static volatile sig_atomic_t got_sigchld = 0;
@@ -123,7 +126,7 @@ static void display_version()
 static void exit_unlock(int status)
 {
         if (error_unlock)
-                kill(locker_pid, sig);
+                kill(locker_pid, send_sig);
         exit(status);
 }
 
@@ -131,6 +134,13 @@ static void exit_if_errunlock(int status)
 {
         if (error_unlock)
                 exit(status);
+}
+
+static void drain_pipe(int pipe_fds[2])
+{
+        char buf[PIPE_BUF];
+
+        while (read(pipe_fds[0], buf, sizeof(buf)) > 0);
 }
 
 /*
@@ -160,6 +170,23 @@ static int register_signal_handlers(void)
                 return -1;
 
         return 0;
+}
+
+static void reap_locker(void)
+{
+        int status;
+        pid_t pid;
+
+        pid = waitpid(locker_pid, &status, WNOHANG);
+        if (pid == locker_pid) {
+                locker_alive = false;
+                if (WIFEXITED(status))
+                        exit_code = WEXITSTATUS(status);
+                else if (WIFSIGNALED(status))
+                        exit_code = 128 + WTERMSIG(status);
+        } else if (pid == -1 && errno != ECHILD) {
+                fprintf(stderr, "waitpid() error: %s\n", strerror(errno));
+        }
 }
 
 /*
@@ -196,17 +223,17 @@ int main(int argc, char **argv)
         }
 
         /* get signal value */
-        sig = parse_signal(sigstr);
-        if (sig == 0) {
+        send_sig = parse_signal(sigstr);
+        if (send_sig == 0) {
                 fprintf(stderr, "Error: Invalid signal '%s' provided.\n", sigstr);
                 exit_if_errunlock(EXIT_FAILURE);
-                sig = parse_signal(DEFAULT_SIGNAL);
+                send_sig = parse_signal(DEFAULT_SIGNAL);
         }
-        const char *abbrev = SIGABBREV(sig);
+        const char *abbrev = SIGABBREV(send_sig);
         if (abbrev)
-                printf("Using signal %d. (SIG%s)\n", sig, abbrev);
+                printf("Using signal %d. (SIG%s)\n", send_sig, abbrev);
         else
-                printf("Using signal %d.\n", sig);
+                printf("Using signal %d.\n", send_sig);
 
         /* self pipe */
         if (pipe2(sig_pipe, O_CLOEXEC | O_NONBLOCK) == -1) {
@@ -238,8 +265,8 @@ int main(int argc, char **argv)
         }
 
         /* poll */
-        int exit_code = 0;
-        bool locker_alive = true;
+        exit_code = 0;
+        locker_alive = true;
 
         while (locker_alive) {
                 struct pollfd pfd = {
@@ -256,29 +283,15 @@ int main(int argc, char **argv)
                 }
 
                 if (pfd.revents & POLLIN) {
-                        char buf[PIPE_BUF];
-                        while (read(sig_pipe[0], buf, sizeof(buf)) > 0);
+                        drain_pipe(sig_pipe);
                 }
 
                 if (got_sigchld) {
                         got_sigchld = 0;
-
-                        int status;
-                        pid_t pid = waitpid(locker_pid, &status, WNOHANG);
-                        if (pid == locker_pid) {
-                                locker_alive = false;
-                                if (WIFEXITED(status))
-                                        exit_code = WEXITSTATUS(status);
-                                else if (WIFSIGNALED(status))
-                                        exit_code = 128 + WTERMSIG(status);
-                        } else if (pid == -1 && errno != ECHILD) {
-                                fprintf(stderr, "waitpid() error: %s\n", strerror(errno));
-                        }
+                        reap_locker();
                 }
         }
 
-        printf("Code: %d\n", exit_code);
-        
         close(sig_pipe[0]);
         close(sig_pipe[1]);
 
