@@ -1,5 +1,21 @@
-option('sd-bus-provider', type: 'string', value: 'auto', description: 'Library to use for sd-bus headers')
-option('man-pages', type: 'feature', value: 'auto', description: 'Build man pages')
-option('program-name', type: 'string', value: '', description: 'Override the installed program name')
-option('default-signal', type: 'string', value: 'SIGUSR1', description: 'Default signal sent to the screen locker on fingerprint match')
-option('default-locker', type: 'string', value: 'swaylock', description: 'Default screen locking program to spawn')
+option('sd-bus-provider',
+  type: 'combo',
+  choices: ['libsystemd', 'libelogind', 'basu', 'auto'],
+  value: 'auto',
+  description: 'Library to use for sd-bus headers')
+option('man-pages',
+  type: 'feature',
+  value: 'auto',
+  description: 'Build man pages')
+option('program-name',
+  type: 'string',
+  value: '',
+  description: 'Override the installed program name')
+option('default-signal',
+  type: 'string',
+  value: 'SIGUSR1',
+  description: 'Default signal sent to the screen locker on fingerprint match')
+option('default-locker',
+  type: 'string',
+  value: 'swaylock',
+  description: 'Default screen locking program to spawn')
