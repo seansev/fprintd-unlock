@@ -1,13 +1,17 @@
 # fprintd-unlock
 
-This program is a wrapper for Linux screen lockers (namely `swaylock`) which enables simple and secure unlocking using a fingerprint reader.
+This program is a wrapper for graphical screen lockers (namely `swaylock`) which enables simple and secure unlocking using a fingerprint reader.
 
 ## Dependencies
 
-- `fprintd`: D-Bus daemon for interfacing with fingerprint hardware.
-- `libsystemd` | `libelogind` | `basu`: D-Bus client via `sd-bus`. Any of these three libraries will suffice, and can optionally be chosen between with the `sd-bus-provider` build option.
+**Build-time:**
 - `meson` & `ninja`: Build system.
+- `libsystemd` | `libelogind` | `basu`: D-Bus client via `sd-bus`. If you're on a Linux distro with systemd (Ubuntu, Fedora, Arch, etc.) you already have this. Otherwise, you'll have to install `libelogind` or `basu` (e.g. on Void, Artix, FreeBSD). This library is auto-detected, but you can choose one with the `sd-bus-provider` build option.
 - `scdoc` (Optional): For generating manpages.
+
+**Runtime:**
+- `fprintd`: D-Bus daemon for interfacing with fingerprint hardware.
+- `dbus`: D-Bus. Installed on every Linux distro, but also needed for FreeBSD.
 
 ## Installation
 
