@@ -56,7 +56,7 @@ conf_data.set('default-locker', default_locker)
 conf_data.set('MAN_PAGES', scdoc.found())
 
 configure_file(
-	input: 'include/config.h.in',
+	input: 'config.h.in',
 	output: 'config.h',
 	configuration: conf_data,
 )
@@ -68,9 +68,9 @@ dependencies = [
 ]
 
 sources = [
-	'main.c',
-	'signum.c',
-	'util.c',
+	'src/main.c',
+	'src/signum.c',
+	'src/util.c',
 ]
 
 fpu_inc = include_directories('include')
@@ -81,6 +81,22 @@ executable(
 	dependencies: dependencies,
 	include_directories: [fpu_inc],
 	install: true,
+)
+
+
+
+locker_sources = [
+	'tests/locker.c',
+	'src/signum.c',
+	'src/util.c',
+]
+
+executable(
+	'locker',
+	locker_sources,
+	include_directories: [fpu_inc],
+	build_by_default: false,
+	install: false,
 )
 
 
