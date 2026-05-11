@@ -96,6 +96,8 @@ static bool locker_alive;
 
 static int sig_pipe[2] = {-1, -1};
 static volatile sig_atomic_t got_sigchld = 0;
+static volatile sig_atomic_t got_sigint = 0;
+static volatile sig_atomic_t got_sigterm = 0;
 
 static sd_bus *bus;
 static char *device_path;
@@ -103,7 +105,7 @@ static char *device_path;
 /*
  * Helpers
  */
-static void display_help()
+static void display_help(void)
 {
 #ifdef MAN_PAGES
         pid_t pid;
@@ -133,17 +135,16 @@ static void display_help()
         exit(EXIT_SUCCESS);
 }
 
-static void display_version()
+static void display_version(void)
 {
         printf("%s: v%s\n", PROGRAM_NAME, PROGRAM_VERSION);
         exit(EXIT_SUCCESS);
 }
 
-static void exit_unlock(int status)
+static void unlock_if_errunlock(void)
 {
         if (error_unlock)
                 kill(locker_pid, send_sig);
-        exit(status);
 }
 
 static void exit_if_errunlock(int status)
@@ -164,10 +165,19 @@ static void drain_pipe(int pipe_fds[2])
  */
 static void on_signal(int sig)
 {
-        (void)sig;
-        got_sigchld = 1;
+        switch (sig) {
+        case SIGCHLD:
+                got_sigchld = 1;
+                break;
+        case SIGINT:
+                got_sigint = 1;
+                break;
+        case SIGTERM:
+                got_sigterm = 1;
+                break;
+        }
         int errno_save = errno;
-        write(sig_pipe[1], &sig, sizeof(sig));
+        (void)write(sig_pipe[1], "1", 1);
         errno = errno_save;
 }
 
@@ -286,7 +296,7 @@ static int claim_device(void)
                 }
 
                 if (error.message)
-                        fprintf(stderr, "Claim error: %s (%s)\n",
+                        fprintf(stderr, "Claim failed: %s (%s)\n",
                                         error.message, error.name);
                 else
                         print_error("Claim", -ret);
@@ -300,6 +310,29 @@ err:
         sd_bus_message_unref(reply);
         sd_bus_error_free(&error);
         return -1;
+}
+
+static int release_device(void)
+{
+        sd_bus_error error = SD_BUS_ERROR_NULL;
+        sd_bus_message *reply = NULL;
+        int ret;
+
+        ret = sd_bus_call_method(bus, FPRINT_BUS, device_path, DEV_IFACE,
+                        "Release", &error, &reply, "");
+        if (ret < 0) {
+                if (error.message)
+                        fprintf(stderr, "Release failed: %s (%s)\n",
+                                        error.message, error.name);
+                else
+                        print_error("Release", -ret);
+                ret = -1;
+        } else
+                ret = 0;
+
+        sd_bus_message_unref(reply);
+        sd_bus_error_free(&error);
+        return ret;
 }
 
 /*
@@ -385,13 +418,19 @@ int main(int argc, char **argv)
         }
 
         /* initialize dbus */
-        if (init_bus() < 0)
-                exit_unlock(EXIT_FAILURE);
+        if (init_bus() < 0) {
+                unlock_if_errunlock();
+                exit_code = EXIT_FAILURE;
+                goto out_pipe;
+        }
 
         printf("Fprint device available at %s\n", device_path);
 
-        if (claim_device() < 0)
-                exit_unlock(EXIT_FAILURE);
+        if (claim_device() < 0) {
+                unlock_if_errunlock();
+                exit_code = EXIT_FAILURE;
+                goto out_bus;
+        }
 
         printf("Device claimed: %s\n", device_path);
 
@@ -413,7 +452,9 @@ int main(int argc, char **argv)
                         if (errno == EINTR)
                                 continue;
                         print_error("poll()", errno);
-                        exit_unlock(EXIT_FAILURE);
+                        unlock_if_errunlock();
+                        exit_code = EXIT_FAILURE;
+                        goto out_release;
                 }
 
                 if (pfds[PFD_SIGNAL].revents & POLLIN) {
@@ -424,9 +465,19 @@ int main(int argc, char **argv)
                         got_sigchld = 0;
                         reap_locker();
                 }
+
+                if (got_sigint || got_sigterm)
+                        break;
         }
 
+out_release:
+        release_device();
+        printf("Device released: %s\n", device_path);
+
+out_bus:
         close_bus();
+
+out_pipe:
         close(sig_pipe[0]);
         close(sig_pipe[1]);
 
