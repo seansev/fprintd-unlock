@@ -225,7 +225,6 @@ static int init_bus(void)
                         "GetDefaultDevice", &error, &reply, "");
         if (ret < 0) {
                 fprintf(stderr, "Failed to get default fprint device. Is fprintd running?\n");
-                print_error("GetDefaultDevice", -ret);
                 goto err;
         }
 
@@ -257,6 +256,50 @@ static void close_bus(void)
         device_path = NULL;
         sd_bus_unref(bus);
         bus = NULL;
+}
+
+static int claim_device(void)
+{
+        sd_bus_error error = SD_BUS_ERROR_NULL;
+        sd_bus_message *reply = NULL;
+        int ret;
+        int attempts;
+
+        for (attempts = 0; attempts < 10; attempts++) {
+                ret = sd_bus_call_method(bus, FPRINT_BUS, device_path,
+                                DEV_IFACE, "Claim", &error, &reply, "s", "");
+                if (ret >= 0) {
+                        sd_bus_message_unref(reply);
+                        sd_bus_error_free(&error);
+                        return 0;
+                }
+
+                if (error.name && strcmp(error.name,
+                                FPRINT_BUS ".Error.AlreadyInUse") == 0) {
+                        fprintf(stderr, "Claim error: Fingerprint device in use.\n");
+                        sd_bus_message_unref(reply);
+                        reply = NULL;
+                        sd_bus_error_free(&error);
+                        error = SD_BUS_ERROR_NULL;
+                        sleep(1);
+                        continue;
+                }
+
+                if (error.message)
+                        fprintf(stderr, "Claim error: %s (%s)\n",
+                                        error.message, error.name);
+                else
+                        print_error("Claim", -ret);
+                
+                goto err;
+        }
+
+        fprintf(stderr, "Claim failed after %d attempts.\n", attempts);
+
+err:
+        sd_bus_message_unref(reply);
+        sd_bus_error_free(&error);
+        return -1;
 }
 
 /*
@@ -342,10 +385,15 @@ int main(int argc, char **argv)
         }
 
         /* initialize dbus */
-        if (init_bus() == -1)
+        if (init_bus() < 0)
                 exit_unlock(EXIT_FAILURE);
 
         printf("Fprint device available at %s\n", device_path);
+
+        if (claim_device() < 0)
+                exit_unlock(EXIT_FAILURE);
+
+        printf("Device claimed: %s\n", device_path);
 
         /* poll */
         exit_code = 0;
