@@ -216,7 +216,7 @@ static int init_bus(void)
 
         ret = sd_bus_default_system(&bus);
         if (ret < 0) {
-                perror("Failed to connect to D-Bus system bus. Is the system bus installed and running?\n");
+                fprintf(stderr, "Failed to connect to D-Bus system bus. Is the system bus installed and running?\n");
                 print_error("sd_bus_default_system()", -ret);
                 goto err;
         }
@@ -224,7 +224,7 @@ static int init_bus(void)
         ret = sd_bus_call_method(bus, FPRINT_BUS, MGR_PATH, MGR_IFACE,
                         "GetDefaultDevice", &error, &reply, "");
         if (ret < 0) {
-                perror("Failed to get default fprint device. Is fprintd running?\n");
+                fprintf(stderr, "Failed to get default fprint device. Is fprintd running?\n");
                 print_error("GetDefaultDevice", -ret);
                 goto err;
         }
