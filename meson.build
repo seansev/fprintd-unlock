@@ -14,8 +14,8 @@ project (
 cc = meson.get_compiler('c')
 
 
-
-scdoc = find_program('scdoc', required: get_option('man-pages'))
+man_pages = get_option('man-pages')
+scdoc = find_program('scdoc', required: man_pages)
 
 if get_option('sd-bus-provider') == 'auto'
 	sdbus = dependency('libsystemd', 'libelogind', 'basu')
@@ -53,6 +53,7 @@ conf_data.set('program-name', program_name)
 conf_data.set('version', meson.project_version())
 conf_data.set('default-signal', default_signal)
 conf_data.set('default-locker', default_locker)
+conf_data.set('MAN_PAGES', scdoc.found())
 
 configure_file(
 	input: 'include/config.h.in',

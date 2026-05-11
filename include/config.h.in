@@ -8,3 +8,4 @@
 #define PROGRAM_VERSION "@version@"
 #define DEFAULT_SIGNAL "@default-signal@"
 #define DEFAULT_LOCKER "@default-locker@"
+#mesondefine MAN_PAGES

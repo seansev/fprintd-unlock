@@ -70,8 +70,10 @@ static const char usage[] =
         "\n"
         "  -v, --version\n"
         "    Display the program version.\n"
+#ifdef MAN_PAGES
         "\n"
         "For more details, see " PROGRAM_NAME "(1).\n"
+#endif
         "\n";
 
 /*
@@ -100,13 +102,14 @@ static char *device_path;
  */
 static void display_help()
 {
+#ifdef MAN_PAGES
         pid_t pid;
         int status;
         int null_fd;
 
         pid = fork();
         if (pid == 0) {
-                /* hide stderr */
+                /* hide stderr, errors are OK just ignore */
                 null_fd = open("/dev/null", O_WRONLY);
                 if (null_fd != -1)
                         dup2(null_fd, STDERR_FILENO);
@@ -117,8 +120,12 @@ static void display_help()
 
         waitpid(pid, &status, 0);
 
-        if (WIFEXITED(status) && WEXITSTATUS(status) != EXIT_SUCCESS)
-                fprintf(stderr, "%s", usage);
+        /* don't show static help if man succeeded */
+        if (WIFEXITED(status) && WEXITSTATUS(status) == EXIT_SUCCESS)
+                exit(EXIT_SUCCESS);
+#endif
+
+        fprintf(stderr, "%s", usage);
 
         exit(EXIT_SUCCESS);
 }
